@@ -1,0 +1,21 @@
+[app]
+name = "app-translator"
+version = "0.1.0"
+description = "Import an app you already have — translate a fly.toml into an installable OpenHost app"
+
+[runtime.container]
+image = "Dockerfile"
+port = 8080
+
+[routing]
+health_check = "/health"
+# Generated repos are served over git's dumb HTTP protocol under /git/, which the
+# router has to be able to clone without owner credentials.
+public_paths = ["/git/"]
+
+[resources]
+memory_mb = 512
+cpu_cores = 0.5
+
+[data]
+app_data = true

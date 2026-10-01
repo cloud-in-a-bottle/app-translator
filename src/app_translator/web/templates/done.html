@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>{{ service.name }} is ready to install</h1>
+
+{% if secret_keys %}
+<section class="warn">
+  <h2>Set these secrets first</h2>
+  <p>The app fetches them on every start and exits with an error if any is missing:</p>
+  <ul>{% for key in secret_keys %}<li><code>{{ key }}</code></li>{% endfor %}</ul>
+  <p>Set them in the secrets app on <code>{{ zone_domain }}</code>, then install.</p>
+</section>
+{% endif %}
+
+<p class="cta">
+  <a class="button" href="{{ install_url }}">Install {{ service.name }} on this compute space</a>
+</p>
+
+<p class="hint">
+  That link opens the dashboard's add-app page with the generated repo prefilled. The repo lives at
+  <a href="{{ published.browse_url }}"><code>{{ published.clone_url }}</code></a>
+  ({{ published.host_kind }}).
+</p>
+
+<h2>What was generated</h2>
+<ul class="files">
+  {% for file in files %}<li><code>{{ file.path }}</code></li>{% endfor %}
+</ul>
+<p class="hint">Read <code>TRANSLATION_NOTES.md</code> in the repo for everything the translation changed or dropped.</p>
+
+<p><a href="/">Import another app</a></p>
+{% endblock %}

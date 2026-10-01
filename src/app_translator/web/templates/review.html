@@ -1,0 +1,136 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Review the translation</h1>
+<p class="lede">
+  Everything below is prefilled from <code>{{ source_label }}</code>{% if inspected %} and from the
+  image's own metadata{% endif %}. Fix anything that looks wrong, then generate the app.
+</p>
+
+{% if notes %}
+<section class="notes">
+  <h2>What needs your attention</h2>
+  {% for note in notes %}
+  <div class="note note-{{ note.severity }}">
+    <code>{{ note.field }}</code>
+    <span class="badge">{{ note.severity.replace("_", " ") }}</span>
+    <p>{{ note.message }}</p>
+  </div>
+  {% endfor %}
+</section>
+{% endif %}
+
+<form method="post" action="/generate">
+  <input type="hidden" name="source_text" value="{{ source_text }}">
+
+  <fieldset>
+    <legend>App</legend>
+    <label for="name">Name <small>lowercase, becomes the subdomain</small></label>
+    <input id="name" name="name" value="{{ service.name }}" required>
+
+    <label for="description">Description</label>
+    <input id="description" name="description" value="{{ service.description }}">
+
+    <label for="image_ref">Container image</label>
+    <input id="image_ref" name="image_ref" value="{{ service.image.ref }}" required>
+
+    <label for="command">Command <small>full argv — replaces the image's entrypoint</small></label>
+    <input id="command" name="command" value="{{ command }}">
+    <input type="hidden" name="image_user" value="{{ service.image_user }}">
+    {% if image_user %}
+    <label class="inline">
+      <input type="checkbox" name="run_as_root" {% if service.run_as_root %}checked{% endif %}>
+      run as root instead of the image's user <code>{{ image_user }}</code>
+    </label>
+    <p class="hint">
+      The app's data directory is owned by root inside the container, so an image that drops to another
+      user usually cannot write to it. Under rootless podman, container root is still an unprivileged
+      host user.
+    </p>
+    {% endif %}
+  </fieldset>
+
+  <fieldset>
+    <legend>Serving</legend>
+    <label for="http_port">HTTP port
+      {% if image_ports %}<small>image exposes {{ image_ports|join(", ") }}</small>{% endif %}
+    </label>
+    <input id="http_port" name="http_port" type="number" value="{{ service.http_port or '' }}" required>
+
+    <label for="health_path">Health check path</label>
+    <input id="health_path" name="health_path" value="{{ service.health_path or '' }}" placeholder="/health">
+
+    <label for="public_paths">Public paths <small>comma separated; everything else needs owner login</small></label>
+    <input id="public_paths" name="public_paths" value="{{ service.public_paths|join(', ') }}" placeholder="/webhook, /oauth/callback">
+  </fieldset>
+
+  <fieldset>
+    <legend>Resources</legend>
+    <label for="memory_mb">Memory (MB)</label>
+    <input id="memory_mb" name="memory_mb" type="number" value="{{ service.resources.memory_mb }}" required>
+
+    <label for="cpu_cores">CPU cores</label>
+    <input id="cpu_cores" name="cpu_cores" type="text" value="{{ service.resources.cpu_cores }}" required>
+  </fieldset>
+
+  <fieldset>
+    <legend>Environment</legend>
+    <p class="hint">
+      Plain values are baked into the generated image. Values marked secret are fetched from this
+      compute space's secrets service at startup instead — set them there before launching.
+    </p>
+    <table class="env">
+      <thead><tr><th>Key</th><th>Value</th><th>Secret</th></tr></thead>
+      <tbody>
+      {% for entry in service.env %}
+        <tr>
+          <td><input name="env_key" value="{{ entry.key }}"></td>
+          <td>
+            <input name="env_value" value="{{ entry.value or '' }}" {% if entry.is_secret %}placeholder="set in the secrets app"{% endif %}>
+            {% if entry.data_relative %}
+            <input type="hidden" name="env_data_relative" value="{{ entry.key }}">
+            <small class="hint">relative to the app's data directory — resolved at startup</small>
+            {% endif %}
+          </td>
+          <td><input type="checkbox" name="env_secret" value="{{ entry.key }}" {% if entry.is_secret %}checked{% endif %}></td>
+        </tr>
+      {% endfor %}
+      {% for index in range(3) %}
+        <tr>
+          <td><input name="env_key" placeholder="KEY"></td>
+          <td><input name="env_value" placeholder="value"></td>
+          <td><input type="checkbox" name="env_secret" value=""></td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    <p class="hint">To mark a new row secret, type the key first, then tick the box after generating once — or set the value in the secrets app and leave the value blank.</p>
+  </fieldset>
+
+  {% if service.mounts %}
+  <fieldset>
+    <legend>Persisted paths</legend>
+    <p class="hint">
+      These become symlinks into the app's permanent data directory at startup. That needs write
+      access to the parent path inside the container — if the image runs as a non-root user, untick
+      it and point the app at <code>$OPENHOST_APP_DATA_DIR</code> with its own setting instead.
+    </p>
+    {% for mount in service.mounts %}
+    <div class="row">
+      <input name="mount_path" value="{{ mount.container_path }}">
+      <label class="inline">
+        <input type="checkbox" name="mount_symlink" value="{{ mount.container_path }}" {% if mount.symlink_at_startup %}checked{% endif %}>
+        symlink at startup
+      </label>
+    </div>
+    {% endfor %}
+  </fieldset>
+  {% endif %}
+
+  {% if service.gpu %}
+  <p class="warn">The source config asked for a GPU. OpenHost parses that flag but never passes it to the container runtime, so the app will not get one.</p>
+  <input type="hidden" name="gpu" value="on">
+  {% endif %}
+
+  <button type="submit">Generate the app</button>
+</form>
+{% endblock %}

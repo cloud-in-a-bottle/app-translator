@@ -1,0 +1,29 @@
+# Example input: a realistic fly.toml for Prometheus.
+app = "prometheus"
+primary_region = "iad"
+
+[build]
+  image = "prom/prometheus:v2.53.0"
+
+[http_service]
+  internal_port = 9090
+  force_https = true
+
+  [[http_service.checks]]
+    path = "/-/healthy"
+    interval = "30s"
+
+[processes]
+  web = "/bin/prometheus --config.file=/etc/prometheus/prometheus.yml --storage.tsdb.path=/prometheus --web.enable-lifecycle"
+
+[[mounts]]
+  source = "prometheus_data"
+  destination = "/prometheus"
+
+[[vm]]
+  memory = "1gb"
+  cpus = 1
+
+[metrics]
+  port = 9090
+  path = "/metrics"

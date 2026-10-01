@@ -1,0 +1,31 @@
+# Example input: a realistic fly.toml for Grafana.
+app = "grafana"
+primary_region = "iad"
+
+[build]
+  image = "grafana/grafana:11.1.0"
+
+[env]
+  GF_ANALYTICS_REPORTING_ENABLED = "false"
+  GF_USERS_ALLOW_SIGN_UP = "false"
+  GF_SECURITY_ADMIN_PASSWORD = "change-me-before-deploying"
+
+[http_service]
+  internal_port = 3000
+  force_https = true
+  auto_stop_machines = false
+  auto_start_machines = true
+  min_machines_running = 1
+
+  [[http_service.checks]]
+    path = "/api/health"
+    interval = "15s"
+    timeout = "2s"
+
+[[mounts]]
+  source = "grafana_data"
+  destination = "/var/lib/grafana"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "512mb"

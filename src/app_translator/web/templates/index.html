@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Import an app from a fly.toml</h1>
+<p class="lede">
+  Paste a link to a <code>fly.toml</code> (or the file itself). I translate what I can,
+  show you what I could not, and hand back a link that installs the app on this compute space.
+</p>
+
+<form method="post" action="/review">
+  <label for="source_url">Link to a fly.toml, or a GitHub repo that contains one</label>
+  <input id="source_url" name="source_url" type="url" placeholder="https://github.com/owner/repo">
+
+  <details>
+    <summary>or paste the file</summary>
+    <textarea name="source_text" rows="12" placeholder="app = &quot;my-app&quot;"></textarea>
+  </details>
+
+  <button type="submit">Translate</button>
+</form>
+
+{% if examples %}
+<h2>Try an example</h2>
+<ul class="examples">
+  {% for example in examples %}
+  <li>
+    <form method="post" action="/review">
+      <input type="hidden" name="example" value="{{ example }}">
+      <button class="link" type="submit">{{ example }}</button>
+    </form>
+  </li>
+  {% endfor %}
+</ul>
+{% endif %}
+
+<p class="footnote">Generated repos are hosted by the <strong>{{ host_kind }}</strong> backend.</p>
+{% endblock %}
