@@ -155,3 +155,13 @@ def test_dockerfile_build_is_flagged_as_needing_action() -> None:
 
     assert stack.service.image.kind == "dockerfile"
     assert stack.service.image.ref == "/other/Dockerfile"
+
+
+def test_absolute_dockerfile_path_is_made_repo_relative() -> None:
+    """openhost joins the path onto the repo dir, so a leading slash escapes the repo."""
+    stack = parse_fly_toml(
+        'app = "demo"\n[build]\ndockerfile = "/other/Dockerfile"\n[http_service]\ninternal_port = 8080\n'
+    )
+
+    assert stack.service.image.ref == "other/Dockerfile"
+    assert any(note.severity == "assumed" and "leading slash" in note.message for note in stack.notes)

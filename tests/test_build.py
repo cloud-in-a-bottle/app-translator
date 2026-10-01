@@ -112,4 +112,4 @@ def test_manifest_for_an_own_repo_app_points_at_its_real_dockerfile() -> None:
     stack = parse_fly_toml('app = "demo"\n[build]\ndockerfile = "/other/Dockerfile"\n[http_service]\ninternal_port = 8080\n')
     manifest = render_manifest(stack.service)
 
-    assert 'image = "/other/Dockerfile"' in manifest
+    assert 'image = "other/Dockerfile"' in manifest

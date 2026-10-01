@@ -92,7 +92,19 @@ def _parse_image(data: dict[str, Any], notes: list[TranslationNote]) -> ImageSou
         )
         return ImageSource(kind="registry", ref=ref)
     if build.get("dockerfile"):
-        path = str(build["dockerfile"])
+        raw_path = str(build["dockerfile"])
+        path = raw_path.lstrip("/")
+        if path != raw_path:
+            notes.append(
+                TranslationNote(
+                    field="[build].dockerfile",
+                    severity="assumed",
+                    message=(
+                        f"rewrote {raw_path!r} as {path!r}: fly reads it relative to the repo, but openhost joins it "
+                        "onto the repo path, so a leading slash would point outside the repo."
+                    ),
+                )
+            )
         notes.append(
             TranslationNote(
                 field="[build].dockerfile",

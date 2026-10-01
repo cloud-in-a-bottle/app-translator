@@ -18,6 +18,14 @@
       <strong>Install the app's own repo</strong> (recommended). Commit this manifest to its root, then install
       the repo directly — OpenHost clones it and builds the Dockerfile that is already there.
       <pre class="detail">{{ own_repo_manifest }}</pre>
+      {% if service.mounts %}
+      <p class="hint">
+        Note: the manifest alone does not redirect
+        {% for mount in service.mounts %}<code>{{ mount.container_path }}</code>{% if not loop.last %}, {% endif %}{% endfor %}
+        into storage that survives a rebuild. In its own repo the app should write to
+        <code>$OPENHOST_APP_DATA_DIR</code> instead — set whatever option it uses for that path.
+      </p>
+      {% endif %}
       {% if own_repo_install_url %}
       <p><a class="button" href="{{ own_repo_install_url }}">Install {{ source_repo_url }}</a>
       <small class="hint">works once the manifest above is on its default branch</small></p>
