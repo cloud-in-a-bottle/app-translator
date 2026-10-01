@@ -3,6 +3,7 @@
 import attr
 
 from app_translator.emit.dockerfile import render_dockerfile
+from app_translator.emit.startup import DATA_PLACEHOLDER
 from app_translator.emit.manifest import render_manifest
 from app_translator.emit.notes import render_notes
 from app_translator.emit.startup import render_startup_script
@@ -48,6 +49,7 @@ def needs_startup_shim(service: ServiceSpec, release_command: str | None) -> boo
         service.secret_keys
         or service.data_relative_env
         or any(mount.symlink_at_startup for mount in service.mounts)
+        or DATA_PLACEHOLDER in (service.command or "")
         or release_command
     )
 

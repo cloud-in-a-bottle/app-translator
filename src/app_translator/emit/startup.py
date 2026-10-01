@@ -9,6 +9,10 @@ import shlex
 
 from app_translator.ir import ServiceSpec
 
+# Stand-in for the app's data directory inside a command, expanded at startup so the
+# generated image survives the app being renamed.
+DATA_PLACEHOLDER = "@OPENHOST_DATA@"
+
 _SECRET_FETCH = """
 explain_failure() {
     status="$1"
@@ -71,6 +75,24 @@ print(urllib.request.urlopen(request, timeout=30).read().decode())
 }
 """
 
+_EXPAND_ARGUMENTS = """
+# Resolve the data-directory placeholder in the command's arguments. Done here rather
+# than baked into the image so renaming the app does not break the path.
+argument_count=$#
+index=0
+while [ $index -lt $argument_count ]; do
+    argument="$1"
+    shift
+    case "$argument" in
+        *@OPENHOST_DATA@*)
+            argument=$(printf '%s' "$argument" | sed "s|@OPENHOST_DATA@|$OPENHOST_APP_DATA_DIR|g")
+            ;;
+    esac
+    set -- "$@" "$argument"
+    index=$((index + 1))
+done
+"""
+
 _REDIRECT = """
 redirect_path() {
     target="$1"
@@ -120,6 +142,15 @@ def render_startup_script(service: ServiceSpec, *, release_command: str | None =
             store = f'"$OPENHOST_APP_DATA_DIR"/persisted-{index}'
             body.append(f"redirect_path {shlex.quote(mount.container_path)} {store}")
         body.append("")
+
+    for index, mount in enumerate(service.mounts):
+        if not mount.symlink_at_startup:
+            body.append(f'mkdir -p "$OPENHOST_APP_DATA_DIR/persisted-{index}"')
+    if any(not mount.symlink_at_startup for mount in service.mounts):
+        body.append("")
+
+    if service.command and DATA_PLACEHOLDER in service.command:
+        body += [_EXPAND_ARGUMENTS.strip(), ""]
 
     if release_command:
         body += [

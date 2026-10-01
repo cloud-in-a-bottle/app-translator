@@ -67,3 +67,62 @@ def test_root_image_is_left_alone() -> None:
     planned, _ = plan_persistence(service, ImageConfig(entrypoint=("/app",), user="root"))
 
     assert planned.run_as_root is False
+
+
+PROMETHEUS_CONFIG = """
+app = "prometheus"
+
+[build]
+  image = "prom/prometheus:v2.53.0"
+
+[http_service]
+  internal_port = 9090
+
+[processes]
+  web = "/bin/prometheus --config.file=/etc/prometheus/prometheus.yml --storage.tsdb.path=/prometheus"
+
+[[mounts]]
+  source = "prometheus_data"
+  destination = "/prometheus"
+"""
+
+PROMETHEUS_IMAGE = ImageConfig(
+    entrypoint=("/bin/prometheus",),
+    exposed_ports=(9090,),
+    user="nobody",
+    volumes=("/prometheus",),
+)
+
+
+def test_a_path_in_the_command_is_rewritten_rather_than_symlinked() -> None:
+    """An image with a VOLUME on the path cannot be symlinked — rm fails with EBUSY."""
+    service = parse_fly_toml(PROMETHEUS_CONFIG).service
+    planned, notes = plan_persistence(service, PROMETHEUS_IMAGE)
+
+    assert "--storage.tsdb.path=@OPENHOST_DATA@/persisted-0" in (planned.command or "")
+    # Only the standalone path is rewritten; the binary and the config path are untouched.
+    assert "/bin/prometheus" in (planned.command or "")
+    assert "--config.file=/etc/prometheus/prometheus.yml" in (planned.command or "")
+    assert planned.mounts[0].symlink_at_startup is False
+    assert any("points at the app's data directory" in note.message for note in notes)
+
+
+def test_a_volume_path_with_no_handle_warns_about_ebusy() -> None:
+    service = parse_fly_toml(PROMETHEUS_CONFIG.replace(
+        '  web = "/bin/prometheus --config.file=/etc/prometheus/prometheus.yml --storage.tsdb.path=/prometheus"',
+        '  web = "/bin/prometheus"',
+    )).service
+    planned, notes = plan_persistence(service, PROMETHEUS_IMAGE)
+
+    assert planned.mounts[0].symlink_at_startup is True
+    assert any("declares a VOLUME" in note.message and note.severity == "needs_action" for note in notes)
+
+
+def test_path_rewriting_respects_path_boundaries() -> None:
+    from app_translator.plan import rewrite_path_in_command
+
+    command = "/bin/prometheus --config.file=/etc/prometheus/prometheus.yml --storage.tsdb.path=/prometheus"
+    rewritten = rewrite_path_in_command(command, "/prometheus", "DATA")
+
+    assert rewritten == "/bin/prometheus --config.file=/etc/prometheus/prometheus.yml --storage.tsdb.path=DATA"
+    assert rewrite_path_in_command("/bin/prometheus", "/prometheus", "DATA") is None

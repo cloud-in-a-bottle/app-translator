@@ -6,12 +6,26 @@ When the image exposes its own setting for that path (as `grafana/grafana` does 
 `GF_PATHS_DATA`), overriding that setting is both safer and simpler.
 """
 
+import re
+
 import attr
 
+from app_translator.emit.startup import DATA_PLACEHOLDER
 from app_translator.ir import EnvVar
 from app_translator.ir import ServiceSpec
 from app_translator.ir import TranslationNote
 from app_translator.registry import ImageConfig
+
+
+def rewrite_path_in_command(command: str, path: str, replacement: str) -> str | None:
+    """Replace `path` in a command only where it is a whole path, not part of a longer one.
+
+    `/prometheus` must match in `--storage.tsdb.path=/prometheus` but not in
+    `/bin/prometheus` or `/etc/prometheus/prometheus.yml`.
+    """
+    pattern = re.compile(r"(?:^|(?<=[\s=:,]))" + re.escape(path) + r"(?=[\s=:,/]|$)")
+    rewritten, count = pattern.subn(replacement, command)
+    return rewritten if count else None
 
 
 def _image_env(image_config: ImageConfig) -> dict[str, str]:
@@ -43,9 +57,32 @@ def plan_persistence(
     env: list[EnvVar] = list(service.env)
     mounts = list(service.mounts)
 
+    command = service.command
     for index, mount in enumerate(service.mounts):
         matching_keys = sorted(key for key, value in image_env.items() if value == mount.container_path)
         store = f"persisted-{index}"
+
+        # Second choice: the path appears in the command, so point the flag at the data
+        # directory. Needed for images that declare a VOLUME on it, where no symlink can win.
+        rewritten = (
+            rewrite_path_in_command(command, mount.container_path, f"{DATA_PLACEHOLDER}/{store}")
+            if not matching_keys and command
+            else None
+        )
+        if rewritten is not None:
+            command = rewritten
+            mounts[index] = attr.evolve(mount, symlink_at_startup=False)
+            notes.append(
+                TranslationNote(
+                    field="[[mounts]]",
+                    severity="info",
+                    message=(
+                        f"the command points at {mount.container_path}, so that argument now points at the app's "
+                        "data directory instead. The path is resolved at startup, so renaming the app keeps working."
+                    ),
+                )
+            )
+            continue
 
         if matching_keys:
             for key in matching_keys:
@@ -66,6 +103,21 @@ def plan_persistence(
                         f"the image configures {mount.container_path} through {', '.join(matching_keys)}, so that "
                         "setting is pointed at the app's data directory instead of symlinking the path. Safer, and "
                         f"it works even though the image runs as user {image_config.user or 'root'}."
+                    ),
+                )
+            )
+            continue
+
+        if mount.container_path in image_config.volumes:
+            notes.append(
+                TranslationNote(
+                    field="[[mounts]]",
+                    severity="needs_action",
+                    message=(
+                        f"the image declares a VOLUME at {mount.container_path}, so the container runtime mounts "
+                        "something there and the path cannot be replaced with a symlink (it fails with 'Device or "
+                        "resource busy'). Nothing in the image's command or settings references that path either, so "
+                        "set the app's own data-directory option by hand."
                     ),
                 )
             )
@@ -105,6 +157,6 @@ def plan_persistence(
         )
 
     return (
-        attr.evolve(service, env=tuple(env), mounts=tuple(mounts), run_as_root=run_as_root),
+        attr.evolve(service, env=tuple(env), mounts=tuple(mounts), command=command, run_as_root=run_as_root),
         tuple(notes),
     )

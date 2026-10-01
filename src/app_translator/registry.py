@@ -29,6 +29,7 @@ class ImageConfig:
     exposed_ports: tuple[int, ...] = ()
     user: str = ""
     env: tuple[str, ...] = ()
+    volumes: tuple[str, ...] = ()
 
     @property
     def argv(self) -> tuple[str, ...]:
@@ -139,4 +140,5 @@ def inspect_image(ref: str, *, timeout: float = 20.0) -> ImageConfig | None:
         exposed_ports=tuple(sorted(exposed)),
         user=str(config.get("User") or ""),
         env=tuple(config.get("Env") or ()),
+        volumes=tuple(sorted(config.get("Volumes") or ())),
     )
