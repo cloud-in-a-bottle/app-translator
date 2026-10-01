@@ -18,6 +18,10 @@ from app_translator.ir import ServiceSpec
 from app_translator.ir import TranslationNote
 from app_translator.naming import sanitize_app_name
 
+# Fly's documented default when internal_port is omitted: "The default is 8080. We
+# recommend applications use the default." It applies to [http_service] and [[services]].
+FLY_DEFAULT_INTERNAL_PORT = 8080
+
 # Caddy owns these on the host, so an app can never bind them itself.
 _RESERVED_HOST_PORTS = frozenset({80, 443})
 _UNPRIVILEGED_PORT_FLOOR = 25
@@ -201,6 +205,30 @@ def _parse_port(data: dict[str, Any], notes: list[TranslationNote]) -> tuple[int
             )
         )
     return main_port, tuple(extra)
+
+
+def _http_check_ports(data: dict[str, Any]) -> list[int]:
+    """Ports that HTTP checks target, in declaration order."""
+    ports: list[int] = []
+    for check in _as_table(data, "checks").values():
+        if not isinstance(check, dict):
+            continue
+        if str(check.get("type", "")).lower() != "http":
+            continue
+        port = check.get("port")
+        if isinstance(port, int) and port not in ports:
+            ports.append(port)
+    return ports
+
+
+def _declares_no_service(data: dict[str, Any]) -> bool:
+    """True when the config exposes nothing — no [http_service] and no [[services]]."""
+    if _as_table(data, "http_service"):
+        return False
+    services = data.get("services")
+    if isinstance(services, list) and any(isinstance(entry, dict) and entry for entry in services):
+        return False
+    return True
 
 
 def _parse_health_path(data: dict[str, Any], main_port: int | None, notes: list[TranslationNote]) -> str | None:
@@ -482,14 +510,34 @@ def parse_fly_toml(raw_text: str) -> ImportedStack:
 
     image = _parse_image(data, notes)
     main_port, extra_ports = _parse_port(data, notes)
-    if main_port is None:
+    if main_port is None and _declares_no_service(data):
         notes.append(
             TranslationNote(
-                field="internal_port",
+                field="[[services]]",
                 severity="needs_action",
-                message="no [http_service].internal_port or TCP [[services]].internal_port found; set the port by hand.",
+                message=(
+                    "this config exposes no HTTP service at all, so there is no port to route. OpenHost serves "
+                    "every app over HTTP and marks an app that does not answer on its main port as failed, so "
+                    "a non-HTTP service (a database, a queue) cannot be hosted as an app here."
+                ),
             )
         )
+
+    if main_port is None:
+        for candidate in _http_check_ports(data):
+            main_port = candidate
+            notes.append(
+                TranslationNote(
+                    field="[checks]",
+                    severity="assumed",
+                    message=(
+                        f"no service declares a port, so took {candidate} from an HTTP check. Verify it — a check "
+                        "port is often an internal health endpoint rather than the app's own port."
+                    ),
+                )
+            )
+            break
+
     health_path = _parse_health_path(data, main_port, notes)
     resources, gpu = _parse_resources(data, notes)
     command, entrypoint = _parse_command(data, notes)

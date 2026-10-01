@@ -89,9 +89,13 @@
   <fieldset>
     <legend>Serving</legend>
     <label for="http_port">HTTP port
-      {% if image_ports %}<small>image exposes {{ image_ports|join(", ") }}</small>{% endif %}
+      <small>
+        {%- if port_source %}from {{ port_source }}{% endif -%}
+        {%- if image_ports %}{% if port_source %} · {% endif %}image exposes {{ image_ports|join(", ") }}{% endif -%}
+      </small>
     </label>
-    <input id="http_port" name="http_port" type="number" value="{{ service.http_port or '' }}" required>
+    <input id="http_port" name="http_port" type="text" inputmode="numeric" pattern="[0-9]*"
+           value="{{ service.http_port or '' }}" required>
 
     <label for="health_path">Health check path</label>
     <input id="health_path" name="health_path" value="{{ service.health_path or '' }}" placeholder="/health">
@@ -103,7 +107,8 @@
   <fieldset>
     <legend>Resources</legend>
     <label for="memory_mb">Memory (MB)</label>
-    <input id="memory_mb" name="memory_mb" type="number" value="{{ service.resources.memory_mb }}" required>
+    <input id="memory_mb" name="memory_mb" type="text" inputmode="numeric" pattern="[0-9]*"
+           value="{{ service.resources.memory_mb }}" required>
 
     <label for="cpu_cores">CPU cores</label>
     <input id="cpu_cores" name="cpu_cores" type="text" value="{{ service.resources.cpu_cores }}" required>

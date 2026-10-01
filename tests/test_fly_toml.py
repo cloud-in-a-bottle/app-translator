@@ -165,3 +165,26 @@ def test_absolute_dockerfile_path_is_made_repo_relative() -> None:
 
     assert stack.service.image.ref == "other/Dockerfile"
     assert any(note.severity == "assumed" and "leading slash" in note.message for note in stack.notes)
+
+
+def test_a_config_with_no_service_says_there_is_nothing_to_route() -> None:
+    """postgres-ha's shape: services = [], checks on an internal port, no HTTP app."""
+    stack = parse_fly_toml(
+        """
+app = "postgres-ha-example"
+services = []
+
+[build]
+  image = "flyio/postgres:14"
+
+  [checks.pg]
+    type = "http"
+    path = "/flycheck/pg"
+    port = 5500
+"""
+    )
+
+    assert any(note.field == "[[services]]" and "no HTTP service at all" in note.message for note in stack.notes)
+    # A check port is a usable hint, but flagged as a guess rather than silently trusted.
+    assert stack.service.http_port == 5500
+    assert any(note.field == "[checks]" and note.severity == "assumed" for note in stack.notes)

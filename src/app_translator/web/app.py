@@ -25,6 +25,7 @@ from app_translator.emit.manifest import render_manifest
 from app_translator.fetch import FetchError
 from app_translator.fetch import fetch_config_text
 from app_translator.fetch import github_repo_url
+from app_translator.frontends.fly_toml import FLY_DEFAULT_INTERNAL_PORT
 from app_translator.frontends.fly_toml import UnsupportedConfigError
 from app_translator.frontends.fly_toml import parse_fly_toml
 from app_translator.hosting.base import RepoHost
@@ -32,6 +33,7 @@ from app_translator.hosting.forgejo import ForgejoError
 from app_translator.hosting.forgejo import ForgejoHost
 from app_translator.hosting.self_served import SelfServedGitHost
 from app_translator.ir import ServiceSpec
+from app_translator.ir import TranslationNote
 from app_translator.jobs import Job
 from app_translator.jobs import JobStore
 from app_translator.netprobe import probe
@@ -139,22 +141,46 @@ def _translate(
     stack = parse_fly_toml(source_text)
     service = stack.service
     image_config = inspect_image(service.image.ref) if service.image.kind == "registry" else None
+    notes = list(stack.notes)
+
+    # Where the port came from, so the form can say rather than leave the user guessing.
+    port_source = "the config" if service.http_port is not None else ""
 
     # The image's own metadata fills holes the config left: the port it listens on and
     # the command to run.
     if service.http_port is None and image_config and image_config.exposed_ports:
         service = attr.evolve(service, http_port=image_config.exposed_ports[0])
+        port_source = "the image's EXPOSE"
+    elif service.http_port is not None and not port_source:
+        port_source = "an HTTP check in the config"
+
+    if service.http_port is None:
+        service = attr.evolve(service, http_port=FLY_DEFAULT_INTERNAL_PORT)
+        port_source = f"fly's default of {FLY_DEFAULT_INTERNAL_PORT}"
+        notes.append(
+            TranslationNote(
+                field="internal_port",
+                severity="assumed",
+                message=(
+                    f"nothing declared a port, so this is fly's documented default of {FLY_DEFAULT_INTERNAL_PORT}. "
+                    "Check it against the app — if nothing listens there, the app will install and then fail its "
+                    "readiness check."
+                ),
+            )
+        )
 
     service, persistence_notes = plan_persistence(service, image_config)
-    return _review_context(
+    context = _review_context(
         source_text,
         service,
-        stack.notes + persistence_notes,
+        tuple(notes) + persistence_notes,
         image_config,
         source_label=source_label,
         settings=settings,
         source_repo_url=source_repo_url,
     )
+    context["port_source"] = port_source
+    return context
 
 
 async def _run_job(app_state: Any, job_id: str, **translate_kwargs: Any) -> None:  # noqa: ANN401

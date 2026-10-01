@@ -79,3 +79,22 @@ def test_favicon_is_served(client: TestClient) -> None:
 
     assert response.status_code == 200
     assert response.headers["content-type"].startswith("image/svg+xml")
+
+
+def test_the_port_falls_back_to_flys_default_and_says_so(client: TestClient) -> None:
+    """A config that declares no port at all still produces a usable, labelled form."""
+    config = 'app = "noport"\n[build]\nimage = "nginx:1.27-alpine"\n'
+
+    location = client.post("/review", data={"source_text": config}, follow_redirects=False).headers["location"]
+    deadline = time.monotonic() + 60
+    while time.monotonic() < deadline:
+        page = client.get(location)
+        if "Review the translation" in page.text:
+            # nginx:alpine EXPOSEs 80, so the image wins over fly's default.
+            assert 'id="http_port"' in page.text
+            assert "from the image's EXPOSE" in page.text or "from fly's default of 8080" in page.text
+            # No spinner on the port field: a stray scroll must not change it.
+            assert 'id="http_port" name="http_port" type="text"' in page.text
+            return
+        time.sleep(0.5)
+    pytest.fail("the translation never finished")
