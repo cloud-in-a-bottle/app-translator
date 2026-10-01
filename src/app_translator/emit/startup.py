@@ -96,11 +96,10 @@ def render_startup_script(service: ServiceSpec, *, release_command: str | None =
     if service.data_relative_env:
         body.append("")
 
-    if service.mounts:
+    symlinked = [(index, mount) for index, mount in enumerate(service.mounts) if mount.symlink_at_startup]
+    if symlinked:
         body += [_REDIRECT.strip(), ""]
-        for index, mount in enumerate(service.mounts):
-            if not mount.symlink_at_startup:
-                continue
+        for index, mount in symlinked:
             store = f'"$OPENHOST_APP_DATA_DIR"/persisted-{index}'
             body.append(f"redirect_path {shlex.quote(mount.container_path)} {store}")
         body.append("")

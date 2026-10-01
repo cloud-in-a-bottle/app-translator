@@ -80,3 +80,16 @@ def test_notes_and_secrets_example_are_written() -> None:
 def test_refuses_to_generate_a_shim_with_no_command() -> None:
     with pytest.raises(MissingCommandError, match="command"):
         _repo(image_config=None)
+
+
+def test_unused_redirect_helper_is_not_emitted() -> None:
+    """When every mount is handled by an env override, the symlink helper is dead code."""
+    from app_translator.plan import plan_persistence
+
+    stack = parse_fly_toml(WITH_SECRET_AND_MOUNT)
+    image = ImageConfig(entrypoint=("/run.sh",), user="472", env=("GF_PATHS_DATA=/var/lib/grafana",))
+    service, _ = plan_persistence(stack.service, image)
+    script = build_repo(stack, service, image_config=image).file("openhost-start.sh").content
+
+    assert "redirect_path" not in script
+    assert 'export GF_PATHS_DATA="$OPENHOST_APP_DATA_DIR/persisted-0"' in script
