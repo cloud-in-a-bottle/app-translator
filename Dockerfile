@@ -8,7 +8,6 @@ RUN apt-get update \
 WORKDIR /app
 COPY pyproject.toml ./
 COPY src ./src
-COPY examples ./examples
 RUN pip install --no-cache-dir .
 
 ENV PORT=8080

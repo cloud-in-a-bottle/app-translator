@@ -35,7 +35,8 @@ from app_translator.web.forms import service_from_form
 logger = logging.getLogger("app_translator")
 
 TEMPLATES_DIR = Path(__file__).parent / "templates"
-EXAMPLES_DIR = Path(__file__).parent.parent.parent.parent / "examples" / "fly"
+# Examples ship inside the package so they are present wherever it is installed.
+EXAMPLES_DIR = Path(__file__).parent.parent / "examples" / "fly"
 
 
 def _settings(request: Request[Any, Any, Any]) -> Settings:
