@@ -93,3 +93,13 @@ def test_unused_redirect_helper_is_not_emitted() -> None:
 
     assert "redirect_path" not in script
     assert 'export GF_PATHS_DATA="$OPENHOST_APP_DATA_DIR/persisted-0"' in script
+
+
+def test_startup_script_explains_an_unapproved_permission() -> None:
+    script = _repo().file("openhost-start.sh").content
+
+    # A 403 here means the owner has not approved the secrets grant yet. Saying
+    # "curl: (22) 403" in the app log is useless; say what to do instead.
+    assert "explain_failure" in script
+    assert "approve-permissions-v2" in script
+    assert "has not been approved yet" in script

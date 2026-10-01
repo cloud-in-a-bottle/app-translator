@@ -10,20 +10,37 @@ import shlex
 from app_translator.ir import ServiceSpec
 
 _SECRET_FETCH = """
+explain_failure() {
+    status="$1"
+    [ "$status" = "200" ] && return 0
+    echo "openhost-start: could not read this app's secrets from the secrets service (HTTP $status)." >&2
+    if [ "$status" = "403" ] || [ "$status" = "401" ]; then
+        echo "openhost-start: this app asks for secrets, and that permission has not been approved yet." >&2
+        echo "openhost-start: approve it at https://$OPENHOST_ZONE_DOMAIN/approve-permissions-v2 and restart the app." >&2
+    elif [ "$status" = "503" ]; then
+        echo "openhost-start: the secrets service is not running on this compute space." >&2
+    fi
+    exit 1
+}
+
 fetch_secrets() {
     keys_json=$(printf '%s' "$OPENHOST_SECRET_KEYS" | tr ' ' '\\n' | sed 's/.*/"&"/' | tr '\\n' ',' | sed 's/,$//')
     body="{\\"keys\\":[$keys_json]}"
     url="$OPENHOST_ROUTER_URL/api/services/v2/call/secrets/get"
     if command -v curl >/dev/null 2>&1; then
-        response=$(curl -fsS -X POST \\
+        http_status=$(curl -sS -o /tmp/openhost-secrets.json -w '%{http_code}' -X POST \\
             -H "Authorization: Bearer $OPENHOST_APP_TOKEN" \\
             -H "Content-Type: application/json" \\
-            -d "$body" "$url")
+            -d "$body" "$url") || http_status=000
+        explain_failure "$http_status"
+        response=$(cat /tmp/openhost-secrets.json)
     elif command -v wget >/dev/null 2>&1; then
-        response=$(wget -q -O - \\
+        if ! response=$(wget -q -O - \\
             --header="Authorization: Bearer $OPENHOST_APP_TOKEN" \\
             --header="Content-Type: application/json" \\
-            --post-data="$body" "$url")
+            --post-data="$body" "$url"); then
+            explain_failure 403
+        fi
     elif command -v python3 >/dev/null 2>&1; then
         response=$(OPENHOST_SECRET_BODY="$body" OPENHOST_SECRET_URL="$url" python3 -c '
 import json, os, urllib.request
