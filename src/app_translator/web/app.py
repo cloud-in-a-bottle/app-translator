@@ -2,6 +2,7 @@ import asyncio
 import logging
 import mimetypes
 from pathlib import Path
+from typing import Annotated
 from typing import Any
 
 import anyio
@@ -13,6 +14,7 @@ from litestar import get
 from litestar import post
 from litestar.plugins.jinja import JinjaTemplateEngine
 from litestar.exceptions import HTTPException
+from litestar.params import Parameter
 from litestar.response import Redirect
 from litestar.response import Template
 from litestar.static_files import create_static_files_router
@@ -274,7 +276,10 @@ async def review(request: Request[Any, Any, Any]) -> Redirect:
 
 
 @get("/jobs/{job_id:str}")
-async def job_status(job_id: str, request: Request[Any, Any, Any]) -> Template:
+async def job_status(
+    job_id: Annotated[str, Parameter(description="Translation job id")],
+    request: Request[Any, Any, Any],
+) -> Template:
     """The review page once the job is done; a waiting page until then."""
     store: JobStore = request.app.state.jobs
     job: Job | None = store.get(job_id)
@@ -359,7 +364,9 @@ async def favicon() -> Response[bytes]:
 
 
 @get("/debug/probe", include_in_schema=False)
-async def debug_probe(url: str = "https://raw.githubusercontent.com/") -> dict[str, Any]:
+async def debug_probe(
+    url: Annotated[str, Parameter(query="url")] = "https://raw.githubusercontent.com/",
+) -> dict[str, Any]:
     """Time DNS and a TCP connect to every address a host resolves to, from in here."""
     result = await anyio.to_thread.run_sync(probe, url)
     return {
@@ -382,7 +389,10 @@ async def debug_probe(url: str = "https://raw.githubusercontent.com/") -> dict[s
 
 
 @get("/git/{path:path}", include_in_schema=False)
-async def serve_git(path: str, request: Request[Any, Any, Any]) -> Response[bytes]:
+async def serve_git(
+    path: Annotated[str, Parameter(description="Path inside a generated bare repo")],
+    request: Request[Any, Any, Any],
+) -> Response[bytes]:
     """Serve generated bare repos over git's dumb HTTP protocol.
 
     Public (unauthenticated) so the compute space's router can clone from here.

@@ -1,6 +1,6 @@
 """The review flow must not block the app while it talks to the network."""
 
-import os
+import html
 import time
 from pathlib import Path
 
@@ -91,8 +91,9 @@ def test_the_port_falls_back_to_flys_default_and_says_so(client: TestClient) -> 
         page = client.get(location)
         if "Review the translation" in page.text:
             # nginx:alpine EXPOSEs 80, so the image wins over fly's default.
-            assert 'id="http_port"' in page.text
-            assert "from the image's EXPOSE" in page.text or "from fly's default of 8080" in page.text
+            rendered = html.unescape(page.text)
+            assert 'id="http_port"' in rendered
+            assert "from the image's EXPOSE" in rendered or "from fly's default of 8080" in rendered
             # No spinner on the port field: a stray scroll must not change it.
             assert 'id="http_port" name="http_port" type="text"' in page.text
             return
