@@ -146,15 +146,13 @@ def _translate(
     notes = list(stack.notes)
 
     # Where the port came from, so the form can say rather than leave the user guessing.
-    port_source = "the config" if service.http_port is not None else ""
+    port_source = stack.port_source
 
     # The image's own metadata fills holes the config left: the port it listens on and
     # the command to run.
     if service.http_port is None and image_config and image_config.exposed_ports:
         service = attr.evolve(service, http_port=image_config.exposed_ports[0])
         port_source = "the image's EXPOSE"
-    elif service.http_port is not None and not port_source:
-        port_source = "an HTTP check in the config"
 
     if service.http_port is None:
         service = attr.evolve(service, http_port=FLY_DEFAULT_INTERNAL_PORT)

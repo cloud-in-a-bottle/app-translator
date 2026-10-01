@@ -510,6 +510,7 @@ def parse_fly_toml(raw_text: str) -> ImportedStack:
 
     image = _parse_image(data, notes)
     main_port, extra_ports = _parse_port(data, notes)
+    port_source = "the config" if main_port is not None else ""
     if main_port is None and _declares_no_service(data):
         notes.append(
             TranslationNote(
@@ -526,6 +527,7 @@ def parse_fly_toml(raw_text: str) -> ImportedStack:
     if main_port is None:
         for candidate in _http_check_ports(data):
             main_port = candidate
+            port_source = f"an HTTP check in the config (port {candidate})"
             notes.append(
                 TranslationNote(
                     field="[checks]",
@@ -570,4 +572,9 @@ def parse_fly_toml(raw_text: str) -> ImportedStack:
         gpu=gpu,
         description=f"imported from fly.toml ({data['app']})",
     )
-    return ImportedStack(source_format="fly.toml", services=(service,), notes=tuple(notes))
+    return ImportedStack(
+        source_format="fly.toml",
+        services=(service,),
+        notes=tuple(notes),
+        port_source=port_source,
+    )

@@ -113,6 +113,9 @@ class ImportedStack:
     services: tuple[ServiceSpec, ...]
     notes: tuple[TranslationNote, ...] = ()
     edges: tuple[ServiceEdge, ...] = ()
+    # Human-readable provenance for the main port, shown on the review form so a
+    # guessed port is never mistaken for a declared one.
+    port_source: str = ""
 
     @property
     def service(self) -> ServiceSpec:

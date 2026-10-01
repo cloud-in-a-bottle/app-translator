@@ -188,3 +188,14 @@ services = []
     # A check port is a usable hint, but flagged as a guess rather than silently trusted.
     assert stack.service.http_port == 5500
     assert any(note.field == "[checks]" and note.severity == "assumed" for note in stack.notes)
+
+
+def test_port_provenance_distinguishes_a_declared_port_from_a_guessed_one() -> None:
+    declared = parse_fly_toml(MINIMAL)
+    assert declared.port_source == "the config"
+
+    guessed = parse_fly_toml(
+        'app = "x"\nservices = []\n[build]\nimage = "flyio/postgres:14"\n'
+        '  [checks.pg]\n  type = "http"\n  path = "/flycheck/pg"\n  port = 5500\n'
+    )
+    assert guessed.port_source == "an HTTP check in the config (port 5500)"
