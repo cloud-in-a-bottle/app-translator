@@ -42,3 +42,14 @@ ul.examples, ul.files { padding-left: 1.1rem; }
 .cta { margin: 1.5rem 0; }
 .footnote { color: #6b6b76; font-size: .85rem; margin-top: 3rem; }
 code { background: #f1f1f4; padding: .1rem .3rem; border-radius: 4px; font-size: .9em; }
+
+.spinner { display: inline-block; width: .7em; height: .7em; margin-left: .35em; border: 2px solid #c9d4ee; border-top-color: #2f5fd0; border-radius: 50%; animation: spin .8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+ul.steps { list-style: none; padding: 0; margin: 1.25rem 0; }
+ul.steps li { padding: .35rem 0 .35rem 1.6rem; position: relative; color: #6b6b76; }
+ul.steps li::before { content: "○"; position: absolute; left: .2rem; }
+ul.steps li.done { color: #1b1b1f; }
+ul.steps li.done::before { content: "●"; color: #2f7d3a; }
+ul.steps li.active { color: #1b1b1f; }
+ul.steps li.active::before { content: "◍"; color: #2f5fd0; }
+@media (prefers-reduced-motion: reduce) { .spinner { animation: none; } }

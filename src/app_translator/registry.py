@@ -11,6 +11,8 @@ from typing import Any
 import attr
 import httpx
 
+from app_translator.net import build_client
+
 _DOCKER_HUB = "registry-1.docker.io"
 _MANIFEST_ACCEPT = ", ".join(
     (
@@ -100,7 +102,7 @@ def inspect_image(ref: str, *, timeout: float = 20.0) -> ImageConfig | None:
     """Return the image's config, or None if it cannot be read."""
     parsed = parse_image_ref(ref)
     try:
-        with httpx.Client(timeout=timeout, follow_redirects=True) as client:
+        with build_client(read_timeout=timeout) as client:
             headers = {"Accept": _MANIFEST_ACCEPT}
             token = _anonymous_token(client, parsed)
             if token:

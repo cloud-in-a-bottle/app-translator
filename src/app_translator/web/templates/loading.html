@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block title %}Translating…{% endblock %}
+{% block head_extra %}<meta http-equiv="refresh" content="2">{% endblock %}
+{% block content %}
+<h1>Translating <span class="spinner" aria-hidden="true"></span></h1>
+<p class="lede">
+  Reading <code>{{ job.source_label }}</code>{% if job.state == "queued" %} — waiting for the translation
+  ahead of it to finish{% endif %}.
+</p>
+
+<ul class="steps">
+  <li class="{{ 'done' if job.state != 'queued' else 'pending' }}">fetch the config</li>
+  <li class="{{ 'done' if job.state == 'done' else ('active' if job.state == 'running' else 'pending') }}">read the image's metadata from its registry</li>
+  <li class="pending">show you the result</li>
+</ul>
+
+<p class="hint">
+  {{ elapsed }}s elapsed{% if ahead %} · {{ ahead }} other translation{{ "s" if ahead != 1 }} queued ahead of this one{% endif %}.
+  This page refreshes itself; the rest of the app stays usable in another tab.
+</p>
+<p class="hint">Reading an image's metadata means several round trips to a registry, so a few seconds is normal.</p>
+{% endblock %}

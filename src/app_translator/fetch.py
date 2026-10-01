@@ -5,6 +5,8 @@ from urllib.parse import urlparse
 
 import httpx
 
+from app_translator.net import build_client
+
 _GITHUB_BLOB = re.compile(r"^https?://github\.com/([^/]+)/([^/]+)/blob/([^/]+)/(.+)$")
 _GITHUB_REPO = re.compile(r"^https?://github\.com/([^/]+)/([^/]+?)(?:\.git)?/?$")
 
@@ -46,7 +48,7 @@ def fetch_config_text(source_url: str, *, timeout: float = 20.0) -> tuple[str, s
     if parsed.scheme not in ("http", "https"):
         raise FetchError("the URL must start with http:// or https://")
 
-    with httpx.Client(timeout=timeout, follow_redirects=True) as client:
+    with build_client(read_timeout=timeout) as client:
         attempted = candidate_urls(source_url)
         for url in attempted:
             text = _get(client, url)
