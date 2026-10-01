@@ -6,6 +6,31 @@
   image's own metadata{% endif %}. Fix anything that looks wrong, then generate the app.
 </p>
 
+{% if builds_from_source %}
+<section class="warn">
+  <h2>This app builds from its own source</h2>
+  <p>
+    The config builds <code>{{ service.image.ref }}</code> out of the app's own repository, and a generated
+    repo has no copy of that source — so there is nothing here to build. Two ways forward:
+  </p>
+  <ol>
+    <li>
+      <strong>Install the app's own repo</strong> (recommended). Commit this manifest to its root, then install
+      the repo directly — OpenHost clones it and builds the Dockerfile that is already there.
+      <pre class="detail">{{ own_repo_manifest }}</pre>
+      {% if own_repo_install_url %}
+      <p><a class="button" href="{{ own_repo_install_url }}">Install {{ source_repo_url }}</a>
+      <small class="hint">works once the manifest above is on its default branch</small></p>
+      {% endif %}
+    </li>
+    <li>
+      <strong>Or point at a published image</strong> below, if the project pushes one to a registry. Then the
+      generated repo is self-contained and nothing needs committing upstream.
+    </li>
+  </ol>
+</section>
+{% endif %}
+
 {% if notes %}
 <section class="notes">
   <h2>What needs your attention</h2>
@@ -30,8 +55,12 @@
     <label for="description">Description</label>
     <input id="description" name="description" value="{{ service.description }}">
 
-    <label for="image_ref">Container image</label>
-    <input id="image_ref" name="image_ref" value="{{ service.image.ref }}" required>
+    <label for="image_ref">Published image reference
+      <small>e.g. <code>grafana/grafana:11.1.0</code> — not a path to a Dockerfile</small>
+    </label>
+    <input id="image_ref" name="image_ref"
+           value="{% if not builds_from_source %}{{ service.image.ref }}{% endif %}"
+           placeholder="owner/image:tag" required>
 
     <label for="command">Command <small>full argv — replaces the image's entrypoint</small></label>
     <input id="command" name="command" value="{{ command }}">

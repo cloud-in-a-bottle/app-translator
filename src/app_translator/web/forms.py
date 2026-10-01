@@ -67,7 +67,15 @@ def service_from_form(
 
     image_ref = _single(form, "image_ref").strip()
     if not image_ref:
-        raise FormError("the container image is required")
+        raise FormError(
+            "a published image reference is required (for example 'grafana/grafana:11.1.0'). The generated "
+            "repo cannot build the app from its own source, because it does not contain that source."
+        )
+    if image_ref.startswith("/") or image_ref.lower().endswith("dockerfile") or "/dockerfile" in image_ref.lower():
+        raise FormError(
+            f"{image_ref!r} looks like a path to a Dockerfile, not a published image. The generated repo has no "
+            "copy of the app's source to build, so it needs an image that already exists in a registry."
+        )
 
     port = _int(form, "http_port", field_label="the HTTP port")
     if not 1 <= port <= 65535:

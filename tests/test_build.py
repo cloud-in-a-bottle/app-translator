@@ -103,3 +103,13 @@ def test_startup_script_explains_an_unapproved_permission() -> None:
     assert "explain_failure" in script
     assert "approve-permissions-v2" in script
     assert "has not been approved yet" in script
+
+
+def test_manifest_for_an_own_repo_app_points_at_its_real_dockerfile() -> None:
+    """When the app builds from its own repo, the manifest must name that Dockerfile path."""
+    from app_translator.emit.manifest import render_manifest
+
+    stack = parse_fly_toml('app = "demo"\n[build]\ndockerfile = "/other/Dockerfile"\n[http_service]\ninternal_port = 8080\n')
+    manifest = render_manifest(stack.service)
+
+    assert 'image = "/other/Dockerfile"' in manifest

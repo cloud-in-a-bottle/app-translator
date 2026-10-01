@@ -81,11 +81,6 @@ def test_buildpack_builds_are_refused() -> None:
         parse_fly_toml('app = "demo"\n[build]\nbuilder = "paketobuildpacks/builder:base"\n')
 
 
-def test_no_image_source_is_refused() -> None:
-    with pytest.raises(UnsupportedConfigError, match="no image source"):
-        parse_fly_toml('app = "demo"\n[http_service]\ninternal_port = 80\n')
-
-
 def test_not_a_fly_config_is_refused() -> None:
     with pytest.raises(UnsupportedConfigError, match="no top-level"):
         parse_fly_toml('[build]\nimage = "nginx"\n')
@@ -144,3 +139,19 @@ app = "demo"
     )
     assert stack.service.extra_ports == ()
     assert any("below the rootless-podman floor" in note.message for note in stack.notes)
+
+
+def test_missing_build_section_means_it_builds_from_its_own_repo() -> None:
+    """A fly.toml with no [build] still builds a Dockerfile — flyctl just detects it."""
+    stack = parse_fly_toml('app = "demo"\n[http_service]\ninternal_port = 8080\n')
+
+    assert stack.service.image.kind == "dockerfile"
+    assert stack.service.image.ref == "Dockerfile"
+    assert any(note.field == "[build]" and note.severity == "needs_action" for note in stack.notes)
+
+
+def test_dockerfile_build_is_flagged_as_needing_action() -> None:
+    stack = parse_fly_toml('app = "demo"\n[build]\ndockerfile = "/other/Dockerfile"\n[http_service]\ninternal_port = 8080\n')
+
+    assert stack.service.image.kind == "dockerfile"
+    assert stack.service.image.ref == "/other/Dockerfile"

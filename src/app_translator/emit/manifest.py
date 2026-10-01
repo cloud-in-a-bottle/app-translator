@@ -30,10 +30,11 @@ def render_manifest(service: ServiceSpec, *, version: str = "0.1.0") -> str:
     ]
     if service.description:
         lines.append(f"description = {_toml_string(service.description)}")
+    dockerfile_path = service.image.ref if service.image.kind == "dockerfile" else "Dockerfile"
     lines += [
         "",
         "[runtime.container]",
-        'image = "Dockerfile"',
+        f"image = {_toml_string(dockerfile_path)}",
         f"port = {service.http_port}",
     ]
 

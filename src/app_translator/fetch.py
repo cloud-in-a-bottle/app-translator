@@ -56,3 +56,15 @@ def fetch_config_text(source_url: str, *, timeout: float = 20.0) -> tuple[str, s
         "could not fetch a config from that URL. Tried: " + ", ".join(attempted) + ". "
         "Paste the file contents directly instead."
     )
+
+
+def github_repo_url(source_url: str) -> str | None:
+    """The canonical repo URL for a pasted GitHub link, if it is one."""
+    url = source_url.strip()
+    if blob := _GITHUB_BLOB.match(url):
+        owner, repo, _ref, _path = blob.groups()
+        return f"https://github.com/{owner}/{repo}"
+    if repo_match := _GITHUB_REPO.match(url):
+        owner, repo = repo_match.groups()
+        return f"https://github.com/{owner}/{repo}"
+    return None

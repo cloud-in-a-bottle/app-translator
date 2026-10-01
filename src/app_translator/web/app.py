@@ -17,8 +17,10 @@ from litestar.template.config import TemplateConfig
 from app_translator.build import MissingCommandError
 from app_translator.build import build_repo
 from app_translator.config import Settings
+from app_translator.emit.manifest import render_manifest
 from app_translator.fetch import FetchError
 from app_translator.fetch import fetch_config_text
+from app_translator.fetch import github_repo_url
 from app_translator.frontends.fly_toml import UnsupportedConfigError
 from app_translator.frontends.fly_toml import parse_fly_toml
 from app_translator.hosting.base import RepoHost
@@ -92,9 +94,22 @@ def _review_context(
     image_config: ImageConfig | None,
     *,
     source_label: str,
+    settings: Settings,
+    source_repo_url: str | None = None,
 ) -> dict[str, Any]:
     command = service.command or (" ".join(image_config.argv) if image_config else "")
+    # An app that builds from its own repo cannot be rehosted in a generated repo — we
+    # have no copy of its source. The right move is a manifest committed to that repo.
+    builds_from_source = service.image.kind == "dockerfile"
+    own_repo_manifest = render_manifest(service) if builds_from_source and service.http_port else ""
+    own_repo_install_url = (
+        f"{settings.install_base_url}?repo={source_repo_url}" if builds_from_source and source_repo_url else ""
+    )
     return {
+        "builds_from_source": builds_from_source,
+        "own_repo_manifest": own_repo_manifest,
+        "own_repo_install_url": own_repo_install_url,
+        "source_repo_url": source_repo_url or "",
         "source_text": source_text,
         "source_label": source_label,
         "service": service,
@@ -114,6 +129,7 @@ async def review(request: Request[Any, Any, Any]) -> Template:
     example = str(form.get("example", "")).strip()
 
     source_label = "pasted config"
+    source_repo_url = github_repo_url(source_url) if source_url else None
     if example:
         candidate = EXAMPLES_DIR / example
         if not candidate.is_file() or candidate.parent != EXAMPLES_DIR:
@@ -147,7 +163,15 @@ async def review(request: Request[Any, Any, Any]) -> Template:
 
     return Template(
         template_name="review.html",
-        context=_review_context(pasted, service, notes, image_config, source_label=source_label),
+        context=_review_context(
+            pasted,
+            service,
+            notes,
+            image_config,
+            source_label=source_label,
+            settings=_settings(request),
+            source_repo_url=source_repo_url,
+        ),
     )
 
 

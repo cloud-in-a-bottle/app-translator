@@ -113,10 +113,17 @@ def _parse_image(data: dict[str, Any], notes: list[TranslationNote]) -> ImageSou
                 message="multi-stage --target is not expressible; the emitted Dockerfile is single-stage.",
             )
         )
-    raise UnsupportedConfigError(
-        "no image source found: fly.toml has neither [build].image nor [build].dockerfile, "
-        "so there is nothing for openhost to build."
+    notes.append(
+        TranslationNote(
+            field="[build]",
+            severity="needs_action",
+            message=(
+                "the config names no image and no Dockerfile, so fly builds whatever Dockerfile it finds in the "
+                "repo. Assuming a Dockerfile at the repo root — the app builds from its own source."
+            ),
+        )
     )
+    return ImageSource(kind="dockerfile", ref="Dockerfile")
 
 
 def _parse_port(data: dict[str, Any], notes: list[TranslationNote]) -> tuple[int | None, tuple[PortSpec, ...]]:
